@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Escalas">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 fill=%22%23050505%22/%3E%3Ctext x=%2250%22 y=%2268%22 font-size=%2258%22 text-anchor=%22middle%22 fill=%22%23f59e0b%22 font-family=%22Arial%22 font-weight=%22bold%22%3EE%3C/text%3E%3C/svg%3E">
+<title>Escalas Armazém</title>
+<style>
+:root{
+  --bg:#050505;
+  --surface:#121212;
+  --surface-2:#1c1c1c;
+  --border:#2c2c2c;
+  --accent:#f59e0b;
+  --accent-ink:#050505;
+  --good:#10b981;
+  --warn:#ef4444;
+  --text:#e2e8f0;
+  --muted:#94a3b8;
+  --muted-dim:#64748b;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-tap-highlight-color:transparent;}
+body{padding-top:calc(52px + env(safe-area-inset-top));padding-bottom:24px;}
+h2,h3{margin:0 0 12px;font-weight:800;letter-spacing:-0.01em;}
+h2{font-size:22px;}
+h3{font-size:18px;}
+h4{font-size:13px;color:var(--muted);font-weight:700;margin:20px 0 10px;}
+p{line-height:1.5;}
+.muted{color:var(--muted);font-size:14px;}
+#app{padding:16px;max-width:640px;margin:0 auto;}
+.tab-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;}
+.tab-header h2,.tab-header h3{margin:0;}
+button{font-family:inherit;cursor:pointer;transition:transform .1s ease, opacity .1s ease;}
+button:active{transform:scale(0.96);opacity:0.85;}
+input,select{font-family:inherit;}
+
+.topheader{position:fixed;top:0;left:0;right:0;height:52px;padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:12px;padding-left:6px;padding-right:14px;background:var(--surface);border-bottom:1px solid var(--border);z-index:20;}
+.hamburger-btn{background:none;border:none;color:var(--text);font-size:22px;padding:8px 12px;line-height:1;}
+.topheader-title{font-weight:800;font-size:16px;}
+
+.sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.sidebar-backdrop.open{opacity:1;pointer-events:auto;}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:230px;background:var(--surface);border-right:1px solid var(--border);z-index:50;transform:translateX(-100%);transition:transform .25s ease;padding:calc(20px + env(safe-area-inset-top)) 10px 20px;display:flex;flex-direction:column;box-shadow:2px 0 24px rgba(0,0,0,0.5);}
+.sidebar.open{transform:translateX(0);}
+.sidebar-title{font-weight:800;font-size:16px;padding:0 10px 16px;}
+.sidebar button{display:flex;align-items:center;gap:12px;text-align:left;background:none;border:none;color:var(--muted);padding:13px 10px;border-radius:8px;font-size:15px;font-weight:600;}
+.sidebar button.active{background:rgba(245,158,11,0.14);color:var(--accent);}
+
+.btn-primary{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#050505;border:none;padding:11px 16px;border-radius:8px;font-weight:700;font-size:15px;}
+.btn-secondary{background:none;color:var(--text);border:1px solid var(--border);padding:11px 16px;border-radius:8px;font-weight:600;font-size:15px;}
+.btn-danger{background:none;color:var(--warn);border:1px solid var(--warn);padding:11px 16px;border-radius:8px;font-weight:600;font-size:15px;}
+.btn-small{padding:7px 12px;font-size:13px;border-radius:6px;}
+.file-label{display:inline-block;cursor:pointer;margin-top:10px;}
+
+.list{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+.list-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:var(--surface);border:none;color:var(--text);padding:13px 14px;text-align:left;width:100%;}
+.row-title{font-weight:600;font-size:15px;}
+.row-sub{font-size:13px;color:var(--muted);}
+
+.date-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;}
+.date-nav button{background:var(--surface);border:1px solid var(--border);color:var(--text);width:42px;height:42px;border-radius:4px;font-size:16px;flex-shrink:0;}
+.date-label{font-weight:800;font-size:16px;text-align:center;flex:1;}
+
+.split-toggle{display:flex;gap:8px;margin-bottom:20px;}
+.split-toggle button{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:4px;font-weight:600;font-size:14px;}
+.split-toggle button.on{background:var(--surface-2);color:var(--accent);border-color:var(--accent);}
+
+.job-toggle-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
+.job-toggle{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:4px;font-size:14px;font-weight:600;}
+.job-toggle.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+
+.period-block{margin-bottom:26px;}
+.period-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;}
+.period-header>span{font-weight:800;font-size:15px;}
+
+.job-block{margin-bottom:14px;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+.job-header{display:flex;justify-content:space-between;padding:10px 12px;font-weight:700;font-size:14px;background:var(--surface);border-left:4px solid var(--muted);}
+.job-header.status-good{border-left-color:var(--good);}
+.job-header.status-partial{border-left-color:var(--accent);}
+.job-header.status-empty{border-left-color:var(--warn);}
+.ratio{color:var(--muted);font-weight:600;}
+
+.slots{display:flex;flex-direction:column;}
+.slot{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border:none;border-top:1px solid var(--border);color:var(--text);padding:12px;font-size:14px;text-align:left;width:100%;}
+.slot.empty{color:var(--muted);justify-content:flex-start;}
+.mini-stars{color:var(--accent);font-size:12px;letter-spacing:1px;}
+
+.empty-state{border:1px dashed var(--border);border-radius:4px;padding:18px;text-align:center;}
+.empty-state-icon{font-size:30px;margin-bottom:8px;line-height:1;}
+.warning-card{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.35);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:13px;line-height:1.7;}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:100;animation:fadeIn .15s ease;}
+.modal{background:var(--surface);border-top:1px solid var(--border);border-radius:10px 10px 0 0;padding:20px;width:100%;max-width:640px;max-height:85vh;overflow-y:auto;padding-bottom:calc(20px + env(safe-area-inset-bottom));animation:slideUp .2s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal label{display:block;margin-bottom:14px;font-size:13px;color:var(--muted);font-weight:600;}
+.modal input[type=text],.modal input[type=number],.modal input[type=date],.modal select{display:block;width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:4px;font-size:15px;}
+.checkbox-row{display:flex;align-items:center;gap:8px;flex-direction:row;}
+.checkbox-row input{width:auto;margin-top:0;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;}
+.choice-btn{display:block;width:100%;text-align:left;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;color:var(--text);}
+.choice-title{display:block;font-weight:700;font-size:15px;margin-bottom:3px;}
+.choice-sub{display:block;font-weight:400;font-size:12px;color:var(--muted);}
+.icon-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.icon-opt{width:40px;height:40px;font-size:19px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.icon-opt.selected{border-color:var(--accent);background:rgba(245,158,11,0.18);}
+
+.skill-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:8px;}
+.skill-row>span:first-child{font-size:14px;flex:1;}
+.stars{display:flex;align-items:center;gap:0;}
+.star{background:none;border:none;color:var(--border);font-size:21px;padding:2px;}
+.star.on{color:var(--accent);}
+.clear-skill{background:none;border:none;color:var(--muted);font-size:11px;margin-left:6px;text-decoration:underline;}
+
+.vac-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:14px;border-bottom:1px solid var(--border);}
+.vac-row button{background:none;border:none;color:var(--warn);font-size:12px;}
+.vac-add{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+.vac-add input{width:auto;flex:1;margin-top:0;min-width:120px;}
+.vac-add button{flex-shrink:0;}
+
+.candidate-list{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin:14px 0;}
+.candidate-row{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border:none;color:var(--text);padding:13px;width:100%;text-align:left;}
+.candidate-row.selected{background:var(--surface);box-shadow:inset 0 0 0 2px var(--accent);}
+.stars-mini{color:var(--accent);font-size:13px;letter-spacing:1px;flex-shrink:0;}
+
+.machine-group{margin-bottom:18px;}
+.stats{margin-top:20px;}
+.stat-row{margin-bottom:12px;}
+.stat-row-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;gap:8px;}
+.stat-row-label>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stat-row-label>span:last-child{color:var(--muted);flex-shrink:0;}
+.stat-bar-track{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;}
+.stat-bar-fill{height:100%;border-radius:4px;}
+.stats p{color:var(--muted);font-size:14px;}
+
+button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+
+.job-week-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:14px;overflow:hidden;}
+.job-week-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px;}
+.job-week-name{font-weight:800;font-size:14px;}
+.job-week-meta{font-size:11px;color:var(--muted-dim);flex-shrink:0;}
+.wg-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--bg);}
+.wg-cell{background:var(--surface);padding:5px 3px;min-height:72px;display:flex;flex-direction:column;gap:3px;}
+.wg-cell.is-today{background:#1e1e1e;box-shadow:inset 0 0 0 1px var(--accent);}
+.wg-day-label{font-size:9px;font-weight:700;color:var(--muted-dim);text-align:center;margin-bottom:1px;}
+.wg-inactive{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted-dim);font-size:11px;}
+.wg-period{display:flex;flex-direction:column;gap:2px;margin-bottom:2px;}
+.wg-period-tag{font-size:8px;color:var(--muted-dim);font-weight:700;}
+.wg-chip{display:block;border:1px solid var(--border);border-radius:5px;padding:3px 2px;font-size:9px;font-weight:700;background:var(--surface-2);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-align:center;}
+.wg-chip-empty{border-style:dashed;color:var(--muted-dim);background:var(--bg);font-weight:400;}
+.color-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;}
+</style>
+</head>
+<body>
+<div class="topheader">
+  <button type="button" class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+  <span class="topheader-title" id="topheaderTitle">Escala</span>
+</div>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-title">Escalas Armazém</div>
+  <button type="button" data-tab="escala" onclick="switchTab('escala')" class="active">📅 Escala</button>
+  <button type="button" data-tab="equipa" onclick="switchTab('equipa')">👥 Equipa</button>
+  <button type="button" data-tab="trabalhos" onclick="switchTab('trabalhos')">🛠️ Trabalhos</button>
+  <button type="button" data-tab="estatisticas" onclick="switchTab('estatisticas')">📊 Estatísticas</button>
+  <button type="button" data-tab="dados" onclick="switchTab('dados')">💾 Dados</button>
+</nav>
+<div id="app"></div>
+<div id="modalRoot"></div>
+<script>
+'use strict';
+var STORAGE_KEY = 'atumWMS_v1';
+
+// ---------- datas ----------
+function todayISO(){
+  var d = new Date();
+  var yy = d.getFullYear();
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return yy+'-'+mm+'-'+dd;
+}
+function addDaysISO(iso, n){
+  var parts = iso.split('-').map(Number);
+  var dt = new Date(parts[0], parts[1]-1, parts[2]);
+  dt.setDate(dt.getDate()+n);
+  var yy = dt.getFullYear();
+  var mm = String(dt.getMonth()+1).padStart(2,'0');
+  var dd = String(dt.getDate()).padStart(2,'0');
+  return yy+'-'+mm+'-'+dd;
+}
+function formatDatePT(iso){
+  var parts = iso.split('-').map(Number);
+  var dt = new Date(parts[0], parts[1]-1, parts[2]);
+  var dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  var meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return dias[dt.getDay()]+', '+parts[2]+' '+meses[parts[1]-1]+' '+parts[0];
+}
+function isDateInRange(iso, start, end){ return iso >= start && iso <= end; }
+function daysBetween(a,b){
+  var ap = a.split('-').map(Number), bp = b.split('-').map(Number);
+  var da = new Date(ap[0],ap[1]-1,ap[2]), db = new Date(bp[0],bp[1]-1,bp[2]);
+  return Math.round((db-da)/86400000);
+}
+
+// ---------- estado ----------
+function defaultState(){
+  return { workers:[], jobs:[], machines:[], schedules:{}, ui:{ tab:'escala', date: todayISO() } };
+}
+var state;
+function loadState(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    var parsed = JSON.parse(raw);
+    var base = defaultState();
+    parsed.workers = parsed.workers || [];
+    parsed.jobs = parsed.jobs || [];
+    parsed.jobs.forEach(function(j, i){
+      if (!j.color) j.color = JOB_COLORS[i % JOB_COLORS.length];
+      if (j.icon === undefined) j.icon = JOB_ICONS[i % JOB_ICONS.length];
+    });
+    parsed.machines = parsed.machines || [];
+    parsed.schedules = parsed.schedules || {};
+    parsed.ui = Object.assign({tab:'escala', date:todayISO()}, parsed.ui||{});
+    return Object.assign(base, parsed);
+  }catch(e){
+    console.error('Erro ao carregar dados', e);
+    return defaultState();
+  }
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ alert('Não foi possível guardar os dados neste dispositivo (armazenamento cheio ou bloqueado).'); }
+}
+function uid(prefix){ return prefix + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3); }
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+var JOB_COLORS = ['#06b6d4','#8b5cf6','#f59e0b','#10b981','#3b82f6','#ef4444','#ec4899','#84cc16'];
+var JOB_ICONS = ['📦','🏷️','🔧','📋','🧰','🚚','🧴','⚙️'];
+function nextJobColor(){ return JOB_COLORS[state.jobs.length % JOB_COLORS.length]; }
+function nextJobIcon(){ return JOB_ICONS[state.jobs.length % JOB_ICONS.length]; }
+function jobLabel(job){ return (job.icon ? job.icon+' ' : '') + esc(job.name); }
+
+// ---------- elegibilidade e justiça de rotação ----------
+function isOnVacation(worker, dateISO){
+  return (worker.vacations||[]).some(function(v){ return isDateInRange(dateISO, v.start, v.end); });
+}
+function fairnessStats(workerId, jobId, dateISO){
+  var since = addDaysISO(dateISO, -30);
+  var horizon = addDaysISO(dateISO, -60);
+  var count30 = 0, lastDate = null;
+  for (var d in state.schedules){
+    if (d >= dateISO || d < horizon) continue;
+    var day = state.schedules[d];
+    for (var p in day.periods){
+      var assigns = day.periods[p][jobId];
+      if (assigns && assigns.indexOf(workerId) !== -1){
+        if (d >= since) count30++;
+        if (lastDate === null || d > lastDate) lastDate = d;
+      }
+    }
+  }
+  return { count30: count30, daysSinceLast: lastDate ? daysBetween(lastDate, dateISO) : null };
+}
+function rankCandidates(jobId, dateISO, excludeSet, mode){
+  return state.workers
+    .filter(function(w){ return w.active !== false; })
+    .filter(function(w){ return w.skills && w.skills[jobId] > 0; })
+    .filter(function(w){ return !isOnVacation(w, dateISO); })
+    .filter(function(w){ return !excludeSet.has(w.id); })
+    .map(function(w){
+      var stats = fairnessStats(w.id, jobId, dateISO);
+      return { id:w.id, name:w.name, rating:w.skills[jobId], count30:stats.count30, daysSinceLast:stats.daysSinceLast };
+    })
+    .sort(function(a,b){
+      var aDs = a.daysSinceLast==null ? 9999 : a.daysSinceLast;
+      var bDs = b.daysSinceLast==null ? 9999 : b.daysSinceLast;
+      if (mode === 'equity'){
+        if (a.count30 !== b.count30) return a.count30 - b.count30;
+        if (bDs !== aDs) return bDs - aDs;
+        if (b.rating !== a.rating) return b.rating - a.rating;
+      } else {
+        if (b.rating !== a.rating) return b.rating - a.rating;
+        if (a.count30 !== b.count30) return a.count30 - b.count30;
+        if (bDs !== aDs) return bDs - aDs;
+      }
+      return a.name.localeCompare(b.name, 'pt');
+    });
+}
+
+// ---------- gestão do dia / escala ----------
+function getDayView(dateISO){
+  return state.schedules[dateISO] || { split:false, activeJobs:[], periods:{FULL:{}} };
+}
+function getOrCreateDay(dateISO){
+  if (!state.schedules[dateISO]){
+    state.schedules[dateISO] = { split:false, activeJobs:[], periods:{FULL:{}} };
+  }
+  return state.schedules[dateISO];
+}
+function setSplitMode(dateISO, split){
+  var day = getOrCreateDay(dateISO);
+  if (day.split === split) return;
+  var hasData = Object.keys(day.periods).some(function(pk){
+    return Object.keys(day.periods[pk]).some(function(jid){
+      return (day.periods[pk][jid]||[]).some(Boolean);
+    });
+  });
+  if (hasData && !confirm('Mudar o modo de turno vai limpar as atribuições já feitas neste dia. Continuar?')) return;
+  day.split = split;
+  day.periods = split ? {AM:{}, PM:{}} : {FULL:{}};
+  day.activeJobs.forEach(function(jobId){
+    var job = state.jobs.find(function(j){ return j.id===jobId; });
+    var need = job ? (job.positionsNeeded||1) : 1;
+    Object.keys(day.periods).forEach(function(pk){ day.periods[pk][jobId] = new Array(need).fill(null); });
+  });
+  saveState(); render();
+}
+function toggleJobActive(dateISO, jobId){
+  var day = getOrCreateDay(dateISO);
+  var idx = day.activeJobs.indexOf(jobId);
+  var job = state.jobs.find(function(j){ return j.id===jobId; });
+  var need = job ? (job.positionsNeeded||1) : 1;
+  if (idx>=0){
+    day.activeJobs.splice(idx,1);
+    Object.keys(day.periods).forEach(function(pk){ delete day.periods[pk][jobId]; });
+  } else {
+    day.activeJobs.push(jobId);
+    Object.keys(day.periods).forEach(function(pk){ day.periods[pk][jobId] = new Array(need).fill(null); });
+  }
+  saveState(); render();
+}
+function changeDate(delta){
+  state.ui.date = addDaysISO(state.ui.date, delta);
+  saveState(); render();
+}
+function jumpToday(){
+  state.ui.date = todayISO();
+  saveState(); render();
+}
+function autofillPeriod(dateISO, periodKey, mode){
+  var day = state.schedules[dateISO];
+  if (!day || !day.periods[periodKey]) return;
+  var period = day.periods[periodKey];
+  var activeJobIds = day.activeJobs || [];
+  var assignedInPeriod = new Set();
+  activeJobIds.forEach(function(jobId){
+    (period[jobId]||[]).forEach(function(wid){ if (wid) assignedInPeriod.add(wid); });
+  });
+  var tasks = [];
+  activeJobIds.forEach(function(jobId){
+    var job = state.jobs.find(function(j){ return j.id===jobId; });
+    if (!job) return;
+    var need = job.positionsNeeded || 1;
+    var arr = period[jobId] = period[jobId] || [];
+    while (arr.length < need) arr.push(null);
+    arr.forEach(function(v, idx){ if (!v) tasks.push({jobId:jobId, idx:idx}); });
+  });
+  while (tasks.length){
+    var bestIdx = -1, bestCands = null, bestLen = Infinity;
+    tasks.forEach(function(t, i){
+      var cands = rankCandidates(t.jobId, dateISO, assignedInPeriod, mode);
+      if (cands.length < bestLen){ bestLen = cands.length; bestIdx = i; bestCands = cands; }
+    });
+    var task = tasks[bestIdx];
+    if (bestCands.length > 0){
+      period[task.jobId][task.idx] = bestCands[0].id;
+      assignedInPeriod.add(bestCands[0].id);
+    } else {
+      period[task.jobId][task.idx] = null;
+    }
+    tasks.splice(bestIdx,1);
+  }
+}
+function autofillPeriodAndRender(dateISO, periodKey, mode){
+  getOrCreateDay(dateISO);
+  autofillPeriod(dateISO, periodKey, mode);
+  saveState(); closeModal(); render();
+}
+function openAutofillChoice(dateISO, periodKey){
+  var html = '<h3>⚡ Preencher automaticamente</h3>'
+    +'<p class="muted">Como quer escolher quem fica com as vagas em aberto?</p>'
+    +'<button type="button" class="choice-btn" onclick="autofillPeriodAndRender(\''+dateISO+'\',\''+periodKey+'\',\'performance\')"><span class="choice-title">📈 Por desempenho</span><span class="choice-sub">Prioriza quem tem melhor rating no trabalho</span></button>'
+    +'<button type="button" class="choice-btn" onclick="autofillPeriodAndRender(\''+dateISO+'\',\''+periodKey+'\',\'equity\')"><span class="choice-title">⚖️ Por equidade</span><span class="choice-sub">Prioriza quem trabalhou menos vezes nisto recentemente</span></button>'
+    +'<div class="modal-actions"><button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button></div>';
+  openModal(html);
+}
+function assignWorkerToSlot(dateISO, periodKey, jobId, slotIdx, workerId){
+  var day = state.schedules[dateISO];
+  var period = day.periods[periodKey];
+  Object.keys(period).forEach(function(jid){
+    period[jid] = (period[jid]||[]).map(function(w){ return w===workerId ? null : w; });
+  });
+  period[jobId][slotIdx] = workerId || null;
+  saveState(); closeModal(); render();
+}
+function openSlotPicker(dateISO, periodKey, jobId, slotIdx){
+  var day = state.schedules[dateISO];
+  var currentWid = day.periods[periodKey][jobId][slotIdx];
+  var excludeSet = new Set();
+  Object.keys(day.periods[periodKey]).forEach(function(jid){
+    (day.periods[periodKey][jid]||[]).forEach(function(wid, i){
+      if (wid && !(jid===jobId && i===slotIdx)) excludeSet.add(wid);
+    });
+  });
+  var candidates = rankCandidates(jobId, dateISO, excludeSet);
+  var job = state.jobs.find(function(j){ return j.id===jobId; });
+  var rows = candidates.map(function(c){
+    return '<button type="button" class="candidate-row '+(c.id===currentWid?'selected':'')+'" onclick="assignWorkerToSlot(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+slotIdx+',\''+c.id+'\')">'
+      +'<span>'+esc(c.name)+'</span><span class="stars-mini">'+'★'.repeat(c.rating)+'☆'.repeat(5-c.rating)+'</span></button>';
+  }).join('') || '<p class="muted" style="padding:12px">Não há trabalhadores qualificados e disponíveis para este trabalho neste período.</p>';
+  var html = '<h3>'+jobLabel(job)+'</h3>'
+    +'<p class="muted">Escolher trabalhador para esta posição</p>'
+    +'<div class="candidate-list">'+rows+'</div>'
+    +(currentWid ? '<button type="button" class="btn-secondary" style="width:100%" onclick="assignWorkerToSlot(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+slotIdx+',null)">Deixar vaga em aberto</button>' : '')
+    +'<div class="modal-actions"><button type="button" class="btn-secondary" onclick="closeModal()">Fechar</button></div>';
+  openModal(html);
+}
+
+// ---------- modal ----------
+function openModal(html){
+  document.getElementById('modalRoot').innerHTML = '<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal">'+html+'</div></div>';
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
+
+// ---------- editor de trabalhador ----------
+var draftWorker = null;
+function openWorkerEditor(workerId){
+  var w = workerId ? state.workers.find(function(x){ return x.id===workerId; }) : null;
+  draftWorker = w ? JSON.parse(JSON.stringify(w)) : {id:null, name:'', active:true, skills:{}, vacations:[]};
+  openModal(workerEditorHTML(workerId));
+}
+function workerEditorHTML(workerId){
+  var isNew = !workerId;
+  var w = draftWorker;
+  var jobsRows = state.jobs.map(function(j){
+    var rating = (w.skills && w.skills[j.id]) || 0;
+    var stars = [1,2,3,4,5].map(function(n){
+      return '<button type="button" class="star '+(n<=rating?'on':'')+'" onclick="setDraftSkill(\''+j.id+'\','+n+')">★</button>';
+    }).join('');
+    return '<div class="skill-row"><span>'+jobLabel(j)+'</span><span class="stars">'+stars+'<button type="button" class="clear-skill" onclick="setDraftSkill(\''+j.id+'\',0)">limpar</button></span></div>';
+  }).join('') || '<p class="muted">Ainda não há trabalhos definidos. Crie trabalhos no separador "Trabalhos".</p>';
+
+  var vacRows = (w.vacations||[]).map(function(v,i){
+    return '<div class="vac-row"><span>'+v.start+' até '+v.end+'</span><button type="button" onclick="removeDraftVacation('+i+')">remover</button></div>';
+  }).join('');
+
+  return '<h3>'+(isNew?'Novo trabalhador':'Editar trabalhador')+'</h3>'
+    +'<label>Nome<input id="wf-name" type="text" value="'+esc(w.name)+'" placeholder="Nome do trabalhador"></label>'
+    +'<label class="checkbox-row"><input id="wf-active" type="checkbox" '+(w.active!==false?'checked':'')+'> Ativo</label>'
+    +'<h4>⭐ Competências por trabalho</h4>'
+    +'<div id="wf-skills">'+jobsRows+'</div>'
+    +'<h4>🏖️ Férias / ausências</h4>'
+    +'<div id="wf-vacations">'+vacRows+'</div>'
+    +'<div class="vac-add"><input id="wf-vac-start" type="date"><input id="wf-vac-end" type="date"><button type="button" class="btn-small btn-secondary" onclick="addDraftVacation()">Adicionar período</button></div>'
+    +'<div class="modal-actions">'
+    +(!isNew?'<button type="button" class="btn-danger" onclick="deleteWorker(\''+workerId+'\')">Eliminar</button>':'')
+    +'<button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>'
+    +'<button type="button" class="btn-primary" onclick="saveWorkerDraft(\''+(workerId||'')+'\')">Guardar</button>'
+    +'</div>';
+}
+function syncDraftFields(){
+  var nameEl = document.getElementById('wf-name');
+  var activeEl = document.getElementById('wf-active');
+  if (nameEl) draftWorker.name = nameEl.value;
+  if (activeEl) draftWorker.active = activeEl.checked;
+}
+function setDraftSkill(jobId, rating){
+  syncDraftFields();
+  draftWorker.skills = draftWorker.skills || {};
+  if (rating===0) delete draftWorker.skills[jobId];
+  else draftWorker.skills[jobId] = rating;
+  openModal(workerEditorHTML(draftWorker.id));
+}
+function addDraftVacation(){
+  syncDraftFields();
+  var s = document.getElementById('wf-vac-start').value;
+  var e = document.getElementById('wf-vac-end').value;
+  if (!s || !e){ alert('Escolha as duas datas.'); return; }
+  if (e < s){ alert('A data final tem de ser igual ou depois da inicial.'); return; }
+  draftWorker.vacations = draftWorker.vacations || [];
+  draftWorker.vacations.push({start:s, end:e});
+  openModal(workerEditorHTML(draftWorker.id));
+}
+function removeDraftVacation(i){
+  syncDraftFields();
+  draftWorker.vacations.splice(i,1);
+  openModal(workerEditorHTML(draftWorker.id));
+}
+function saveWorkerDraft(existingId){
+  syncDraftFields();
+  if (!draftWorker.name || !draftWorker.name.trim()){ alert('Indique o nome do trabalhador.'); return; }
+  if (existingId){
+    var idx = state.workers.findIndex(function(w){ return w.id===existingId; });
+    state.workers[idx] = Object.assign({}, draftWorker, {id:existingId});
+  } else {
+    draftWorker.id = uid('w_');
+    state.workers.push(draftWorker);
+  }
+  saveState(); closeModal(); draftWorker=null; render();
+}
+function deleteWorker(id){
+  if (!confirm('Eliminar este trabalhador? Esta ação não pode ser desfeita.')) return;
+  state.workers = state.workers.filter(function(w){ return w.id!==id; });
+  Object.values(state.schedules).forEach(function(day){
+    Object.values(day.periods).forEach(function(period){
+      Object.keys(period).forEach(function(jobId){
+        period[jobId] = (period[jobId]||[]).map(function(w){ return w===id ? null : w; });
+      });
+    });
+  });
+  saveState(); closeModal(); draftWorker=null; render();
+}
+
+// ---------- editor de trabalho ----------
+function pickJobIcon(icon){
+  document.getElementById('jf-icon').value = icon;
+  document.querySelectorAll('#jf-icon-picker .icon-opt').forEach(function(b){
+    b.classList.toggle('selected', b.dataset.icon===icon);
+  });
+}
+function openJobEditor(jobId){
+  var j = jobId ? state.jobs.find(function(x){ return x.id===jobId; }) : {id:null, name:'', machineId:null, positionsNeeded:1, icon:nextJobIcon()};
+  var machineOptions = '<option value="">Sem máquina associada</option>' + state.machines.map(function(m){
+    return '<option value="'+m.id+'" '+(j.machineId===m.id?'selected':'')+'>'+esc(m.name)+'</option>';
+  }).join('');
+  var iconPicker = JOB_ICONS.map(function(ic){
+    return '<button type="button" class="icon-opt '+(j.icon===ic?'selected':'')+'" data-icon="'+ic+'" onclick="pickJobIcon(\''+ic+'\')">'+ic+'</button>';
+  }).join('');
+  var html = '<h3>'+(jobId?'Editar trabalho':'Novo trabalho')+'</h3>'
+    +'<label>Nome<input id="jf-name" type="text" value="'+esc(j.name)+'" placeholder="ex: Encartonadora"></label>'
+    +'<label>Ícone<div class="icon-picker" id="jf-icon-picker">'+iconPicker+'</div><input type="hidden" id="jf-icon" value="'+(j.icon||'')+'"></label>'
+    +'<label>Máquina<select id="jf-machine">'+machineOptions+'</select></label>'
+    +'<label>Nº de posições necessárias<input id="jf-positions" type="number" min="1" value="'+(j.positionsNeeded||1)+'"></label>'
+    +'<div class="modal-actions">'
+    +(jobId?'<button type="button" class="btn-danger" onclick="deleteJob(\''+jobId+'\')">Eliminar</button>':'')
+    +'<button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>'
+    +'<button type="button" class="btn-primary" onclick="saveJob(\''+(jobId||'')+'\')">Guardar</button>'
+    +'</div>';
+  openModal(html);
+}
+function saveJob(existingId){
+  var name = document.getElementById('jf-name').value.trim();
+  if (!name){ alert('Indique o nome do trabalho.'); return; }
+  var icon = document.getElementById('jf-icon').value || '';
+  var machineId = document.getElementById('jf-machine').value || null;
+  var positions = Math.max(1, parseInt(document.getElementById('jf-positions').value,10) || 1);
+  if (existingId){
+    var j = state.jobs.find(function(x){ return x.id===existingId; });
+    j.name = name; j.machineId = machineId; j.positionsNeeded = positions; j.icon = icon;
+  } else {
+    state.jobs.push({id:uid('j_'), name:name, machineId:machineId, positionsNeeded:positions, color:nextJobColor(), icon:icon});
+  }
+  saveState(); closeModal(); render();
+}
+function deleteJob(id){
+  if (!confirm('Eliminar este trabalho? Vai deixar de aparecer nas escalas e nas competências dos trabalhadores.')) return;
+  state.jobs = state.jobs.filter(function(j){ return j.id!==id; });
+  state.workers.forEach(function(w){ if (w.skills) delete w.skills[id]; });
+  Object.values(state.schedules).forEach(function(day){
+    day.activeJobs = (day.activeJobs||[]).filter(function(jid){ return jid!==id; });
+    Object.values(day.periods).forEach(function(p){ delete p[id]; });
+  });
+  saveState(); closeModal(); render();
+}
+
+// ---------- editor de máquina ----------
+function openMachineEditor(machineId){
+  var m = machineId ? state.machines.find(function(x){ return x.id===machineId; }) : {id:null, name:''};
+  var html = '<h3>'+(machineId?'Editar máquina':'Nova máquina')+'</h3>'
+    +'<label>Nome<input id="mf-name" type="text" value="'+esc(m.name)+'" placeholder="ex: Linha 2"></label>'
+    +'<div class="modal-actions">'
+    +(machineId?'<button type="button" class="btn-danger" onclick="deleteMachine(\''+machineId+'\')">Eliminar</button>':'')
+    +'<button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>'
+    +'<button type="button" class="btn-primary" onclick="saveMachine(\''+(machineId||'')+'\')">Guardar</button>'
+    +'</div>';
+  openModal(html);
+}
+function saveMachine(existingId){
+  var name = document.getElementById('mf-name').value.trim();
+  if (!name){ alert('Indique o nome da máquina.'); return; }
+  if (existingId){
+    state.machines.find(function(m){ return m.id===existingId; }).name = name;
+  } else {
+    state.machines.push({id:uid('m_'), name:name});
+  }
+  saveState(); closeModal(); render();
+}
+function deleteMachine(id){
+  if (!confirm('Eliminar esta máquina? Os trabalhos associados ficam sem máquina.')) return;
+  state.machines = state.machines.filter(function(m){ return m.id!==id; });
+  state.jobs.forEach(function(j){ if (j.machineId===id) j.machineId = null; });
+  saveState(); closeModal(); render();
+}
+
+// ---------- dados: exportar / importar ----------
+function exportData(){
+  var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'escalas-armazem-'+todayISO()+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function importDataFromFile(file){
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var parsed = JSON.parse(e.target.result);
+      if (!parsed.workers || !parsed.jobs) throw new Error('formato inválido');
+      if (!confirm('Isto substitui todos os dados atuais pelos do ficheiro importado. Continuar?')) return;
+      var oldUi = state.ui;
+      state = Object.assign(defaultState(), parsed, {ui:oldUi});
+      saveState(); render();
+      alert('Dados importados com sucesso.');
+    }catch(err){
+      alert('Não foi possível importar: o ficheiro não é uma cópia de segurança válida.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ---------- separador: Escala ----------
+function switchEscalaView(view){
+  state.ui.escalaView = view;
+  saveState(); render();
+}
+function formatDateShortPT(iso){
+  var parts = iso.split('-').map(Number);
+  var meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return parts[2]+' '+meses[parts[1]-1];
+}
+function getWeekStart(dateISO){
+  var parts = dateISO.split('-').map(Number);
+  var dt = new Date(parts[0], parts[1]-1, parts[2]);
+  var dow = dt.getDay();
+  var diffToMonday = (dow === 0) ? -6 : (1 - dow);
+  dt.setDate(dt.getDate() + diffToMonday);
+  var yy = dt.getFullYear(), mm = String(dt.getMonth()+1).padStart(2,'0'), dd = String(dt.getDate()).padStart(2,'0');
+  return yy+'-'+mm+'-'+dd;
+}
+function getWeekDates(dateISO){
+  var start = getWeekStart(dateISO);
+  var dates = [];
+  for (var i=0;i<7;i++) dates.push(addDaysISO(start,i));
+  return dates;
+}
+function changeWeek(delta){
+  state.ui.date = addDaysISO(state.ui.date, delta*7);
+  saveState(); render();
+}
+function renderEscalaTab(){
+  var view = state.ui.escalaView || 'dia';
+  var toggle = '<div class="split-toggle" style="margin-bottom:18px"><button type="button" class="'+(view==='dia'?'on':'')+'" onclick="switchEscalaView(\'dia\')">Dia</button><button type="button" class="'+(view==='semana'?'on':'')+'" onclick="switchEscalaView(\'semana\')">Semana</button></div>';
+  return toggle + (view==='semana' ? renderSemanaView() : renderDiaView());
+}
+function renderSemanaView(){
+  var weekDates = getWeekDates(state.ui.date);
+  var label = formatDateShortPT(weekDates[0])+' – '+formatDateShortPT(weekDates[6]);
+  var todayBtn = weekDates.indexOf(todayISO())===-1 ? '<button type="button" class="btn-small btn-secondary" onclick="jumpToday()">Esta semana</button>' : '';
+
+  var activeJobIds = new Set();
+  var unfilled = 0;
+  weekDates.forEach(function(d){
+    var day = getDayView(d);
+    day.activeJobs.forEach(function(jid){
+      activeJobIds.add(jid);
+      var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
+      periodKeys.forEach(function(pk){
+        var slots = (day.periods[pk] && day.periods[pk][jid]) || [];
+        unfilled += slots.filter(function(s){ return !s; }).length;
+      });
+    });
+  });
+  var jobsThisWeek = state.jobs.filter(function(j){ return activeJobIds.has(j.id); });
+  var warningHtml = unfilled>0 ? '<div class="warning-card">⚠️ '+unfilled+' vaga'+(unfilled===1?'':'s')+' por preencher esta semana</div>' : '';
+
+  var body = jobsThisWeek.length ? jobsThisWeek.map(function(job){ return renderJobWeekCard(job, weekDates); }).join('')
+    : '<div class="empty-state"><div class="empty-state-icon">📅</div><p class="muted">Nenhum trabalho ativo nesta semana ainda.</p><button type="button" class="btn-primary btn-small" onclick="switchEscalaView(\'dia\')">Ativar trabalhos por dia</button></div>';
+
+  return '<div class="date-nav"><button type="button" onclick="changeWeek(-1)">◄</button><div class="date-label">'+label+'</div><button type="button" onclick="changeWeek(1)">►</button></div>'
+    +(todayBtn?'<div style="text-align:center;margin-bottom:14px">'+todayBtn+'</div>':'')
+    +warningHtml
+    +body;
+}
+function renderJobWeekCard(job, weekDates){
+  var dayAbbr = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  var qualified = state.workers.filter(function(w){ return w.active!==false && w.skills && w.skills[job.id]>0; }).length;
+
+  var cells = weekDates.map(function(dateISO){
+    var day = getDayView(dateISO);
+    var isToday = dateISO === todayISO();
+    var parts = dateISO.split('-').map(Number);
+    var dow = new Date(parts[0],parts[1]-1,parts[2]).getDay();
+    var dLabel = dayAbbr[dow]+' '+parts[2]+(isToday?' <span style="color:var(--accent)">●</span>':'');
+
+    if (day.activeJobs.indexOf(job.id) === -1){
+      return '<div class="wg-cell '+(isToday?'is-today':'')+'"><div class="wg-day-label">'+dLabel+'</div><div class="wg-inactive">—</div></div>';
+    }
+    var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
+    var periodLabels = {AM:'M', PM:'T', FULL:''};
+    var body = periodKeys.map(function(pk){
+      var slots = (day.periods[pk] && day.periods[pk][job.id]) || [];
+      var chips = slots.map(function(wid, idx){
+        if (wid){
+          var w = state.workers.find(function(x){ return x.id===wid; });
+          var wname = w ? w.name.split(' ')[0] : '?';
+          return '<button type="button" class="wg-chip" style="background:'+job.color+'22;border-color:'+job.color+'55;color:'+job.color+'" onclick="openSlotPicker(\''+dateISO+'\',\''+pk+'\',\''+job.id+'\','+idx+')">'+esc(wname)+'</button>';
+        }
+        return '<button type="button" class="wg-chip wg-chip-empty" onclick="openSlotPicker(\''+dateISO+'\',\''+pk+'\',\''+job.id+'\','+idx+')">+</button>';
+      }).join('');
+      var plabel = periodLabels[pk] ? '<span class="wg-period-tag">'+periodLabels[pk]+'</span>' : '';
+      return '<div class="wg-period">'+plabel+chips+'</div>';
+    }).join('');
+
+    return '<div class="wg-cell '+(isToday?'is-today':'')+'"><div class="wg-day-label">'+dLabel+'</div>'+body+'</div>';
+  }).join('');
+
+  return '<div class="job-week-card" style="border-color:'+job.color+'40">'
+    +'<div class="job-week-header" style="background:'+job.color+'18;border-bottom-color:'+job.color+'35">'
+    +'<span class="job-week-name" style="color:'+job.color+'">'+jobLabel(job)+'</span>'
+    +'<span class="job-week-meta">'+qualified+' qualificado'+(qualified===1?'':'s')+'</span>'
+    +'</div>'
+    +'<div class="wg-grid">'+cells+'</div>'
+    +'</div>';
+}
+
+// ---------- separador: Escala (vista dia) ----------
+function renderDiaView(){
+  var dateISO = state.ui.date;
+  var day = getDayView(dateISO);
+  var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
+  var periodLabels = {AM:'Manhã', PM:'Tarde', FULL:'Dia inteiro'};
+
+  var jobPicker = state.jobs.length ? '<div class="job-toggle-list">'+state.jobs.map(function(j){
+    var on = day.activeJobs.indexOf(j.id)!==-1;
+    var style = on ? ' style="background:'+j.color+';border-color:'+j.color+';color:var(--accent-ink)"' : '';
+    return '<button type="button" class="job-toggle '+(on?'on':'')+'"'+style+' onclick="toggleJobActive(\''+dateISO+'\',\''+j.id+'\')">'+jobLabel(j)+'</button>';
+  }).join('')+'</div>' : '<div class="empty-state"><div class="empty-state-icon">🛠️</div><p class="muted">Ainda não tem trabalhos definidos.</p><button type="button" class="btn-primary btn-small" onclick="switchTab(\'trabalhos\')">Ir a Trabalhos</button></div>';
+
+  var periodsHTML = day.activeJobs.length ? periodKeys.map(function(pk){ return renderPeriodBlock(dateISO, day, pk, periodLabels[pk]); }).join('') : '';
+
+  var todayBtn = dateISO !== todayISO() ? '<button type="button" class="btn-small btn-secondary" onclick="jumpToday()">Hoje</button>' : '';
+
+  return '<div class="date-nav"><button type="button" onclick="changeDate(-1)">◄</button><div class="date-label">'+formatDatePT(dateISO)+'</div><button type="button" onclick="changeDate(1)">►</button></div>'
+    +(todayBtn?'<div style="text-align:center;margin-bottom:14px">'+todayBtn+'</div>':'')
+    +'<div class="split-toggle"><button type="button" class="'+(!day.split?'on':'')+'" onclick="setSplitMode(\''+dateISO+'\',false)">Dia inteiro</button><button type="button" class="'+(day.split?'on':'')+'" onclick="setSplitMode(\''+dateISO+'\',true)">Manhã / Tarde</button></div>'
+    +'<h4>Trabalhos de hoje</h4>'
+    +jobPicker
+    +periodsHTML;
+}
+function renderPeriodBlock(dateISO, day, periodKey, label){
+  var rows = day.activeJobs.map(function(jobId){
+    var job = state.jobs.find(function(j){ return j.id===jobId; });
+    if (!job) return '';
+    var slots = (day.periods[periodKey] && day.periods[periodKey][jobId]) || new Array(job.positionsNeeded||1).fill(null);
+    var filled = slots.filter(Boolean).length;
+    var statusClass = filled===slots.length ? 'status-good' : (filled===0 ? 'status-empty' : 'status-partial');
+    var slotRows = slots.map(function(wid, idx){
+      if (wid){
+        var w = state.workers.find(function(x){ return x.id===wid; });
+        var rating = w && w.skills ? (w.skills[jobId]||0) : 0;
+        return '<button type="button" class="slot filled" style="border-left:3px solid '+job.color+'" onclick="openSlotPicker(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+idx+')"><span>'+esc(w?w.name:'?')+'</span><span class="mini-stars">'+'★'.repeat(rating)+'</span></button>';
+      }
+      return '<button type="button" class="slot empty" onclick="openSlotPicker(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+idx+')">+ atribuir trabalhador</button>';
+    }).join('');
+    var statusIcon = statusClass==='status-good' ? '✅' : (statusClass==='status-empty' ? '❗' : '⚠️');
+    return '<div class="job-block"><div class="job-header '+statusClass+'" style="background:'+job.color+'14"><span style="color:'+job.color+'">'+jobLabel(job)+'</span><span class="ratio">'+statusIcon+' '+filled+'/'+slots.length+'</span></div><div class="slots">'+slotRows+'</div></div>';
+  }).join('');
+  return '<div class="period-block"><div class="period-header"><span>'+esc(label)+'</span><button type="button" class="btn-small btn-secondary" onclick="openAutofillChoice(\''+dateISO+'\',\''+periodKey+'\')">Sugerir automaticamente</button></div>'+rows+'</div>';
+}
+
+// ---------- separador: Equipa ----------
+function renderEquipaTab(){
+  var rows = state.workers.length ? state.workers.map(function(w){
+    var numSkills = w.skills ? Object.keys(w.skills).length : 0;
+    return '<button type="button" class="list-row" onclick="openWorkerEditor(\''+w.id+'\')"><span class="row-title">'+esc(w.name)+(w.active===false?' (inativo)':'')+'</span><span class="row-sub">'+numSkills+' competência'+(numSkills===1?'':'s')+'</span></button>';
+  }).join('') : '<div class="empty-state"><div class="empty-state-icon">👥</div><p class="muted">Ainda não há trabalhadores.</p></div>';
+  return '<div class="tab-header"><h2>Equipa</h2><button type="button" class="btn-primary btn-small" onclick="openWorkerEditor(null)">+ Novo</button></div><div class="list">'+rows+'</div>';
+}
+
+// ---------- separador: Trabalhos ----------
+function getSinglePointJobs(){
+  return state.jobs.map(function(j){
+    var qualified = state.workers.filter(function(w){ return w.active!==false && w.skills && w.skills[j.id]>0; });
+    return {job:j, qualified:qualified};
+  }).filter(function(x){ return x.qualified.length === 1; });
+}
+function renderTrabalhosTab(){
+  var spf = getSinglePointJobs();
+  var warningHtml = spf.length ? '<div class="warning-card">⚠️ <strong>Só 1 pessoa qualificada</strong><br>'
+    + spf.map(function(x){ return jobLabel(x.job)+' — '+esc(x.qualified[0].name); }).join('<br>')
+    + '</div>' : '';
+  var groups = [{id:null, name:'Sem máquina associada'}].concat(state.machines);
+  var jobsByMachine = groups.map(function(m){
+    var jobs = state.jobs.filter(function(j){ return (j.machineId||null) === m.id; });
+    if (!jobs.length) return '';
+    var rows = jobs.map(function(j){
+      return '<button type="button" class="list-row" onclick="openJobEditor(\''+j.id+'\')"><span class="row-title"><span class="color-dot" style="background:'+j.color+'"></span>'+jobLabel(j)+'</span><span class="row-sub">'+(j.positionsNeeded||1)+' posiç'+((j.positionsNeeded||1)===1?'ão':'ões')+'</span></button>';
+    }).join('');
+    return '<div class="machine-group"><h4>'+esc(m.name)+'</h4><div class="list">'+rows+'</div></div>';
+  }).join('');
+  var machinesList = state.machines.map(function(m){
+    return '<button type="button" class="list-row" onclick="openMachineEditor(\''+m.id+'\')"><span class="row-title">'+esc(m.name)+'</span></button>';
+  }).join('') || '<div class="empty-state"><div class="empty-state-icon">⚙️</div><p class="muted">Nenhuma máquina definida (opcional — só é útil para agrupar trabalhos).</p></div>';
+  return '<div class="tab-header"><h2>Trabalhos</h2><button type="button" class="btn-primary btn-small" onclick="openJobEditor(null)">+ Novo</button></div>'
+    +warningHtml
+    +(state.jobs.length ? jobsByMachine : '<div class="empty-state"><div class="empty-state-icon">🧰</div><p class="muted">Ainda não há trabalhos.</p></div>')
+    +'<div class="tab-header" style="margin-top:26px"><h3>Máquinas</h3><button type="button" class="btn-secondary btn-small" onclick="openMachineEditor(null)">+ Nova</button></div>'
+    +machinesList;
+}
+
+// ---------- separador: Estatísticas ----------
+function computeStats(days){
+  var since = addDaysISO(todayISO(), -days);
+  var today = todayISO();
+  var workerStats = {}, jobStats = {};
+  Object.keys(state.schedules).forEach(function(d){
+    if (d < since || d > today) return;
+    var day = state.schedules[d];
+    Object.keys(day.periods).forEach(function(pk){
+      var period = day.periods[pk];
+      Object.keys(period).forEach(function(jobId){
+        (period[jobId]||[]).forEach(function(wid){
+          if (!wid) return;
+          workerStats[wid] = (workerStats[wid]||0) + 1;
+          jobStats[jobId] = jobStats[jobId] || {count:0, workers:new Set()};
+          jobStats[jobId].count++;
+          jobStats[jobId].workers.add(wid);
+        });
+      });
+    });
+  });
+  return {workerStats:workerStats, jobStats:jobStats};
+}
+function renderStatBar(label, count, max, color, sub){
+  var pct = max>0 ? Math.round(count/max*100) : 0;
+  return '<div class="stat-row"><div class="stat-row-label"><span>'+label+'</span><span>'+count+(sub?(' · '+sub):'')+'</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:'+pct+'%;background:'+(color||'var(--accent)')+'"></div></div></div>';
+}
+function renderEstatisticasTab(){
+  var stats = computeStats(30);
+  var workerRows = state.workers.filter(function(w){ return w.active!==false; })
+    .map(function(w){ return {name:w.name, count:stats.workerStats[w.id]||0}; })
+    .sort(function(a,b){ return b.count-a.count; });
+  var maxW = Math.max.apply(null, workerRows.map(function(r){return r.count;}).concat([1]));
+  var workerHtml = workerRows.length ? workerRows.map(function(r){ return renderStatBar(esc(r.name), r.count, maxW, null, 'turnos'); }).join('')
+    : '<p class="muted">Sem trabalhadores ainda.</p>';
+
+  var jobRows = state.jobs.map(function(j){
+    var s = stats.jobStats[j.id];
+    return {job:j, count: s?s.count:0, distinct: s?s.workers.size:0};
+  }).sort(function(a,b){ return b.count-a.count; });
+  var maxJ = Math.max.apply(null, jobRows.map(function(r){return r.count;}).concat([1]));
+  var jobHtml = jobRows.length ? jobRows.map(function(r){
+    return renderStatBar(jobLabel(r.job), r.count, maxJ, r.job.color, r.distinct+' pessoa'+(r.distinct===1?'':'s'));
+  }).join('') : '<p class="muted">Sem trabalhos ainda.</p>';
+
+  return '<div class="tab-header"><h2>Estatísticas</h2></div>'
+    +'<p class="muted">Últimos 30 dias — a mesma janela que o preenchimento automático usa para decidir por equidade.</p>'
+    +'<h4>👤 Por trabalhador (turnos)</h4>'+workerHtml
+    +'<h4>🧰 Por trabalho</h4>'+jobHtml;
+}
+
+// ---------- separador: Dados ----------
+function renderDadosTab(){
+  return '<div class="tab-header"><h2>Dados</h2></div>'
+    +'<p class="muted">Os dados ficam guardados apenas neste dispositivo. Faça uma cópia de segurança regularmente para não os perder.</p>'
+    +'<div style="display:flex;flex-direction:column;align-items:flex-start;gap:12px">'
+    +'<button type="button" class="btn-primary" onclick="exportData()">⬇️ Exportar cópia de segurança</button>'
+    +'<label class="file-label btn-secondary" style="margin-top:0">⬆️ Importar cópia de segurança<input type="file" accept="application/json" onchange="importDataFromFile(this.files[0])" style="display:none"></label>'
+    +'</div>'
+    +'<div class="stats"><p>'+state.workers.length+' trabalhadores registados.</p><p>'+state.jobs.length+' trabalhos definidos.</p><p>'+state.machines.length+' máquinas definidas.</p></div>';
+}
+
+// ---------- render principal ----------
+var TAB_TITLES = {escala:'Escala', equipa:'Equipa', trabalhos:'Trabalhos', estatisticas:'Estatísticas', dados:'Dados'};
+function render(){
+  var app = document.getElementById('app');
+  var html = '';
+  if (state.ui.tab === 'escala') html = renderEscalaTab();
+  else if (state.ui.tab === 'equipa') html = renderEquipaTab();
+  else if (state.ui.tab === 'trabalhos') html = renderTrabalhosTab();
+  else if (state.ui.tab === 'estatisticas') html = renderEstatisticasTab();
+  else if (state.ui.tab === 'dados') html = renderDadosTab();
+  app.innerHTML = html;
+  document.querySelectorAll('.sidebar button[data-tab]').forEach(function(btn){
+    btn.classList.toggle('active', btn.dataset.tab === state.ui.tab);
+  });
+  document.getElementById('topheaderTitle').textContent = TAB_TITLES[state.ui.tab] || '';
+}
+function switchTab(tab){
+  state.ui.tab = tab;
+  saveState(); closeSidebar(); render();
+}
+function toggleSidebar(){
+  var open = document.getElementById('sidebar').classList.contains('open');
+  if (open) closeSidebar(); else openSidebar();
+}
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+}
+
+// ---------- arranque ----------
+function init(){
+  state = loadState();
+  render();
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
