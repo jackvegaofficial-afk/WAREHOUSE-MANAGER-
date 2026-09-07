@@ -157,6 +157,11 @@ button:focus-visible, input:focus-visible, select:focus-visible{outline:2px soli
 .wg-period-tag{font-size:8px;color:var(--muted-dim);font-weight:700;}
 .wg-chip{display:block;border:1px solid var(--border);border-radius:5px;padding:3px 2px;font-size:9px;font-weight:700;background:var(--surface-2);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-align:center;}
 .wg-chip-empty{border-style:dashed;color:var(--muted-dim);background:var(--bg);font-weight:400;}
+.wh-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.wh-cell{background:var(--surface-2);border-radius:6px;padding:6px 2px;text-align:center;}
+.wh-cell.is-today{box-shadow:inset 0 0 0 1px var(--accent);}
+.wh-day{font-size:9px;color:var(--muted-dim);font-weight:700;margin-bottom:3px;}
+.wh-name{font-size:9px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;}
 .color-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;}
 </style>
 </head>
@@ -406,6 +411,32 @@ function assignWorkerToSlot(dateISO, periodKey, jobId, slotIdx, workerId){
   period[jobId][slotIdx] = workerId || null;
   saveState(); closeModal(); render();
 }
+function renderWeekHistoryForJob(jobId, dateISO){
+  var weekDates = getWeekDates(dateISO);
+  var dayAbbr = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  var cells = weekDates.map(function(d){
+    var day = getDayView(d);
+    var isToday = d === todayISO();
+    var parts = d.split('-').map(Number);
+    var dow = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+    var names = '—';
+    if (day.activeJobs.indexOf(jobId) !== -1){
+      var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
+      var all = [];
+      periodKeys.forEach(function(pk){
+        ((day.periods[pk] && day.periods[pk][jobId]) || []).forEach(function(wid){
+          if (wid){
+            var w = state.workers.find(function(x){ return x.id===wid; });
+            all.push(w ? w.name.split(' ')[0] : '?');
+          }
+        });
+      });
+      if (all.length) names = all.join(', ');
+    }
+    return '<div class="wh-cell '+(isToday?'is-today':'')+'"><div class="wh-day">'+dayAbbr[dow]+'</div><div class="wh-name">'+esc(names)+'</div></div>';
+  }).join('');
+  return '<div class="wh-grid">'+cells+'</div>';
+}
 function openSlotPicker(dateISO, periodKey, jobId, slotIdx){
   var day = state.schedules[dateISO];
   var currentWid = day.periods[periodKey][jobId][slotIdx];
@@ -422,7 +453,9 @@ function openSlotPicker(dateISO, periodKey, jobId, slotIdx){
       +'<span>'+esc(c.name)+'</span><span class="stars-mini">'+'★'.repeat(c.rating)+'☆'.repeat(5-c.rating)+'</span></button>';
   }).join('') || '<p class="muted" style="padding:12px">Não há trabalhadores qualificados e disponíveis para este trabalho neste período.</p>';
   var html = '<h3>'+jobLabel(job)+'</h3>'
-    +'<p class="muted">Escolher trabalhador para esta posição</p>'
+    +'<p class="muted" style="margin-bottom:6px">Esta semana</p>'
+    +renderWeekHistoryForJob(jobId, dateISO)
+    +'<p class="muted" style="margin-top:16px">Escolher trabalhador para esta posição</p>'
     +'<div class="candidate-list">'+rows+'</div>'
     +(currentWid ? '<button type="button" class="btn-secondary" style="width:100%" onclick="assignWorkerToSlot(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+slotIdx+',null)">Deixar vaga em aberto</button>' : '')
     +'<div class="modal-actions"><button type="button" class="btn-secondary" onclick="closeModal()">Fechar</button></div>';
