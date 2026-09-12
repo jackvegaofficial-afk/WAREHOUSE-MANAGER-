@@ -69,19 +69,12 @@ input,select{font-family:inherit;}
 .date-nav button{background:var(--surface);border:1px solid var(--border);color:var(--text);width:42px;height:42px;border-radius:4px;font-size:16px;flex-shrink:0;}
 .date-label{font-weight:800;font-size:16px;text-align:center;flex:1;}
 
-.split-toggle{display:flex;gap:8px;margin-bottom:20px;}
-.split-toggle button{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:4px;font-weight:600;font-size:14px;}
-.split-toggle button.on{background:var(--surface-2);color:var(--accent);border-color:var(--accent);}
-
-.job-toggle-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
-.job-toggle{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:4px;font-size:14px;font-weight:600;}
-.job-toggle.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
-
-.period-block{margin-bottom:26px;}
-.period-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;}
-.period-header>span{font-weight:800;font-size:15px;}
 
 .job-block{margin-bottom:14px;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+.day-actions{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.day-actions>button{flex:1;min-width:150px;}
+.block-time-row{display:flex;justify-content:space-between;width:100%;text-align:left;background:var(--surface-2);border:none;border-top:1px solid var(--border);color:var(--muted);padding:8px 12px;font-size:12px;}
+.edit-hint{color:var(--muted-dim);}
 .job-header{display:flex;justify-content:space-between;padding:10px 12px;font-weight:700;font-size:14px;background:var(--surface);border-left:4px solid var(--muted);}
 .job-header.status-good{border-left-color:var(--good);}
 .job-header.status-partial{border-left-color:var(--accent);}
@@ -269,11 +262,19 @@ function fairnessStats(workerId, jobId, dateISO){
   for (var d in state.schedules){
     if (d >= dateISO || d < horizon) continue;
     var day = state.schedules[d];
-    for (var p in day.periods){
-      var assigns = day.periods[p][jobId];
-      if (assigns && assigns.indexOf(workerId) !== -1){
+    (day.blocks||[]).forEach(function(b){
+      if (b.jobId===jobId && b.workers.indexOf(workerId)!==-1){
         if (d >= since) count30++;
         if (lastDate === null || d > lastDate) lastDate = d;
+      }
+    });
+    if (day.periods){
+      for (var p in day.periods){
+        var assigns = day.periods[p][jobId];
+        if (assigns && assigns.indexOf(workerId) !== -1){
+          if (d >= since) count30++;
+          if (lastDate === null || d > lastDate) lastDate = d;
+        }
       }
     }
   }
@@ -305,47 +306,17 @@ function rankCandidates(jobId, dateISO, excludeSet, mode){
     });
 }
 
-// ---------- gestão do dia / escala ----------
+// ---------- gestão do dia / escala (blocos com hora) ----------
+function timeToMinutes(t){ var p=t.split(':').map(Number); return p[0]*60+p[1]; }
 function getDayView(dateISO){
-  return state.schedules[dateISO] || { split:false, activeJobs:[], periods:{FULL:{}} };
+  return state.schedules[dateISO] || { blocks: [] };
 }
 function getOrCreateDay(dateISO){
   if (!state.schedules[dateISO]){
-    state.schedules[dateISO] = { split:false, activeJobs:[], periods:{FULL:{}} };
+    state.schedules[dateISO] = { blocks: [] };
   }
+  if (!state.schedules[dateISO].blocks) state.schedules[dateISO].blocks = [];
   return state.schedules[dateISO];
-}
-function setSplitMode(dateISO, split){
-  var day = getOrCreateDay(dateISO);
-  if (day.split === split) return;
-  var hasData = Object.keys(day.periods).some(function(pk){
-    return Object.keys(day.periods[pk]).some(function(jid){
-      return (day.periods[pk][jid]||[]).some(Boolean);
-    });
-  });
-  if (hasData && !confirm('Mudar o modo de turno vai limpar as atribuições já feitas neste dia. Continuar?')) return;
-  day.split = split;
-  day.periods = split ? {AM:{}, PM:{}} : {FULL:{}};
-  day.activeJobs.forEach(function(jobId){
-    var job = state.jobs.find(function(j){ return j.id===jobId; });
-    var need = job ? (job.positionsNeeded||1) : 1;
-    Object.keys(day.periods).forEach(function(pk){ day.periods[pk][jobId] = new Array(need).fill(null); });
-  });
-  saveState(); render();
-}
-function toggleJobActive(dateISO, jobId){
-  var day = getOrCreateDay(dateISO);
-  var idx = day.activeJobs.indexOf(jobId);
-  var job = state.jobs.find(function(j){ return j.id===jobId; });
-  var need = job ? (job.positionsNeeded||1) : 1;
-  if (idx>=0){
-    day.activeJobs.splice(idx,1);
-    Object.keys(day.periods).forEach(function(pk){ delete day.periods[pk][jobId]; });
-  } else {
-    day.activeJobs.push(jobId);
-    Object.keys(day.periods).forEach(function(pk){ day.periods[pk][jobId] = new Array(need).fill(null); });
-  }
-  saveState(); render();
 }
 function changeDate(delta){
   state.ui.date = addDaysISO(state.ui.date, delta);
@@ -355,60 +326,91 @@ function jumpToday(){
   state.ui.date = todayISO();
   saveState(); render();
 }
-function autofillPeriod(dateISO, periodKey, mode){
-  var day = state.schedules[dateISO];
-  if (!day || !day.periods[periodKey]) return;
-  var period = day.periods[periodKey];
-  var activeJobIds = day.activeJobs || [];
-  var assignedInPeriod = new Set();
-  activeJobIds.forEach(function(jobId){
-    (period[jobId]||[]).forEach(function(wid){ if (wid) assignedInPeriod.add(wid); });
-  });
-  var tasks = [];
-  activeJobIds.forEach(function(jobId){
-    var job = state.jobs.find(function(j){ return j.id===jobId; });
-    if (!job) return;
-    var need = job.positionsNeeded || 1;
-    var arr = period[jobId] = period[jobId] || [];
-    while (arr.length < need) arr.push(null);
-    arr.forEach(function(v, idx){ if (!v) tasks.push({jobId:jobId, idx:idx}); });
-  });
-  while (tasks.length){
-    var bestIdx = -1, bestCands = null, bestLen = Infinity;
-    tasks.forEach(function(t, i){
-      var cands = rankCandidates(t.jobId, dateISO, assignedInPeriod, mode);
-      if (cands.length < bestLen){ bestLen = cands.length; bestIdx = i; bestCands = cands; }
-    });
-    var task = tasks[bestIdx];
-    if (bestCands.length > 0){
-      period[task.jobId][task.idx] = bestCands[0].id;
-      assignedInPeriod.add(bestCands[0].id);
-    } else {
-      period[task.jobId][task.idx] = null;
-    }
-    tasks.splice(bestIdx,1);
-  }
+function openBlockEditor(dateISO, blockId){
+  var day = getOrCreateDay(dateISO);
+  var block = blockId ? day.blocks.find(function(b){ return b.id===blockId; }) : null;
+  if (!state.jobs.length){ alert('Crie primeiro um trabalho no separador "Trabalhos".'); return; }
+  var jobOptions = state.jobs.map(function(j){
+    return '<option value="'+j.id+'" '+(block&&block.jobId===j.id?'selected':'')+'>'+(j.icon?j.icon+' ':'')+esc(j.name)+'</option>';
+  }).join('');
+  var html = '<h3>'+(block?'Editar bloco':'Novo bloco')+'</h3>'
+    +'<label>Trabalho<select id="bf-job">'+jobOptions+'</select></label>'
+    +'<label>Início<input id="bf-start" type="time" value="'+(block?block.start:'08:00')+'"></label>'
+    +'<label>Fim<input id="bf-end" type="time" value="'+(block?block.end:'10:00')+'"></label>'
+    +'<div class="modal-actions">'
+    +(block?'<button type="button" class="btn-danger" onclick="deleteBlock(\''+dateISO+'\',\''+blockId+'\')">Eliminar</button>':'')
+    +'<button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>'
+    +'<button type="button" class="btn-primary" onclick="saveBlock(\''+dateISO+'\',\''+(blockId||'')+'\')">Guardar</button>'
+    +'</div>';
+  openModal(html);
 }
-function autofillPeriodAndRender(dateISO, periodKey, mode){
-  getOrCreateDay(dateISO);
-  autofillPeriod(dateISO, periodKey, mode);
+function saveBlock(dateISO, blockId){
+  var jobId = document.getElementById('bf-job').value;
+  var start = document.getElementById('bf-start').value;
+  var end = document.getElementById('bf-end').value;
+  if (!jobId){ alert('Escolha um trabalho.'); return; }
+  if (!start || !end){ alert('Indique a hora de início e de fim.'); return; }
+  if (timeToMinutes(end) <= timeToMinutes(start)){ alert('A hora de fim tem de ser depois da hora de início.'); return; }
+  var day = getOrCreateDay(dateISO);
+  var job = state.jobs.find(function(j){ return j.id===jobId; });
+  var need = job ? (job.positionsNeeded||1) : 1;
+  if (blockId){
+    var b = day.blocks.find(function(x){ return x.id===blockId; });
+    if (b.jobId !== jobId){ b.workers = new Array(need).fill(null); }
+    else { while (b.workers.length < need) b.workers.push(null); b.workers.length = need; }
+    b.jobId = jobId; b.start = start; b.end = end;
+  } else {
+    day.blocks.push({id:uid('b_'), jobId:jobId, start:start, end:end, workers:new Array(need).fill(null)});
+  }
   saveState(); closeModal(); render();
 }
-function openAutofillChoice(dateISO, periodKey){
+function deleteBlock(dateISO, blockId){
+  if (!confirm('Eliminar este bloco?')) return;
+  var day = getOrCreateDay(dateISO);
+  day.blocks = day.blocks.filter(function(b){ return b.id!==blockId; });
+  saveState(); closeModal(); render();
+}
+function autofillDay(dateISO, mode){
+  var day = getOrCreateDay(dateISO);
+  var tasks = [];
+  day.blocks.forEach(function(b){
+    var job = state.jobs.find(function(j){ return j.id===b.jobId; });
+    var need = job ? (job.positionsNeeded||1) : 1;
+    while (b.workers.length < need) b.workers.push(null);
+    b.workers.forEach(function(w, idx){ if (!w) tasks.push({blockId:b.id, idx:idx}); });
+  });
+  while (tasks.length){
+    var bestI=-1, bestCands=null, bestLen=Infinity;
+    tasks.forEach(function(t,i){
+      var block = day.blocks.find(function(b){ return b.id===t.blockId; });
+      var excludeSet = new Set();
+      block.workers.forEach(function(w,ix){ if (w && ix!==t.idx) excludeSet.add(w); });
+      var cands = rankCandidates(block.jobId, dateISO, excludeSet, mode);
+      if (cands.length < bestLen){ bestLen=cands.length; bestI=i; bestCands=cands; }
+    });
+    var task = tasks[bestI];
+    var block = day.blocks.find(function(b){ return b.id===task.blockId; });
+    block.workers[task.idx] = bestCands.length ? bestCands[0].id : null;
+    tasks.splice(bestI,1);
+  }
+}
+function autofillDayAndRender(dateISO, mode){
+  autofillDay(dateISO, mode);
+  saveState(); closeModal(); render();
+}
+function openAutofillChoiceDay(dateISO){
   var html = '<h3>⚡ Preencher automaticamente</h3>'
-    +'<p class="muted">Como quer escolher quem fica com as vagas em aberto?</p>'
-    +'<button type="button" class="choice-btn" onclick="autofillPeriodAndRender(\''+dateISO+'\',\''+periodKey+'\',\'performance\')"><span class="choice-title">📈 Por desempenho</span><span class="choice-sub">Prioriza quem tem melhor rating no trabalho</span></button>'
-    +'<button type="button" class="choice-btn" onclick="autofillPeriodAndRender(\''+dateISO+'\',\''+periodKey+'\',\'equity\')"><span class="choice-title">⚖️ Por equidade</span><span class="choice-sub">Prioriza quem trabalhou menos vezes nisto recentemente</span></button>'
+    +'<p class="muted">Como quer escolher quem fica com as vagas em aberto (todos os blocos de hoje)?</p>'
+    +'<button type="button" class="choice-btn" onclick="autofillDayAndRender(\''+dateISO+'\',\'performance\')"><span class="choice-title">📈 Por desempenho</span><span class="choice-sub">Prioriza quem tem melhor rating no trabalho</span></button>'
+    +'<button type="button" class="choice-btn" onclick="autofillDayAndRender(\''+dateISO+'\',\'equity\')"><span class="choice-title">⚖️ Por equidade</span><span class="choice-sub">Prioriza quem trabalhou menos vezes nisto recentemente</span></button>'
     +'<div class="modal-actions"><button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button></div>';
   openModal(html);
 }
-function assignWorkerToSlot(dateISO, periodKey, jobId, slotIdx, workerId){
-  var day = state.schedules[dateISO];
-  var period = day.periods[periodKey];
-  Object.keys(period).forEach(function(jid){
-    period[jid] = (period[jid]||[]).map(function(w){ return w===workerId ? null : w; });
-  });
-  period[jobId][slotIdx] = workerId || null;
+function assignWorkerToBlockSlot(dateISO, blockId, slotIdx, workerId){
+  var day = getOrCreateDay(dateISO);
+  var block = day.blocks.find(function(b){ return b.id===blockId; });
+  block.workers = block.workers.map(function(w,i){ return (i!==slotIdx && w===workerId) ? null : w; });
+  block.workers[slotIdx] = workerId || null;
   saveState(); closeModal(); render();
 }
 function renderWeekHistoryForJob(jobId, dateISO){
@@ -419,12 +421,12 @@ function renderWeekHistoryForJob(jobId, dateISO){
     var isToday = d === todayISO();
     var parts = d.split('-').map(Number);
     var dow = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+    var blocksForJob = (day.blocks||[]).filter(function(b){ return b.jobId===jobId; });
     var names = '—';
-    if (day.activeJobs.indexOf(jobId) !== -1){
-      var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
+    if (blocksForJob.length){
       var all = [];
-      periodKeys.forEach(function(pk){
-        ((day.periods[pk] && day.periods[pk][jobId]) || []).forEach(function(wid){
+      blocksForJob.forEach(function(b){
+        b.workers.forEach(function(wid){
           if (wid){
             var w = state.workers.find(function(x){ return x.id===wid; });
             all.push(w ? w.name.split(' ')[0] : '?');
@@ -437,27 +439,25 @@ function renderWeekHistoryForJob(jobId, dateISO){
   }).join('');
   return '<div class="wh-grid">'+cells+'</div>';
 }
-function openSlotPicker(dateISO, periodKey, jobId, slotIdx){
-  var day = state.schedules[dateISO];
-  var currentWid = day.periods[periodKey][jobId][slotIdx];
+function openBlockSlotPicker(dateISO, blockId, slotIdx){
+  var day = getOrCreateDay(dateISO);
+  var block = day.blocks.find(function(b){ return b.id===blockId; });
+  var job = state.jobs.find(function(j){ return j.id===block.jobId; });
+  var currentWid = block.workers[slotIdx];
   var excludeSet = new Set();
-  Object.keys(day.periods[periodKey]).forEach(function(jid){
-    (day.periods[periodKey][jid]||[]).forEach(function(wid, i){
-      if (wid && !(jid===jobId && i===slotIdx)) excludeSet.add(wid);
-    });
-  });
-  var candidates = rankCandidates(jobId, dateISO, excludeSet);
-  var job = state.jobs.find(function(j){ return j.id===jobId; });
+  block.workers.forEach(function(w,i){ if (w && i!==slotIdx) excludeSet.add(w); });
+  var candidates = rankCandidates(block.jobId, dateISO, excludeSet);
   var rows = candidates.map(function(c){
-    return '<button type="button" class="candidate-row '+(c.id===currentWid?'selected':'')+'" onclick="assignWorkerToSlot(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+slotIdx+',\''+c.id+'\')">'
+    return '<button type="button" class="candidate-row '+(c.id===currentWid?'selected':'')+'" onclick="assignWorkerToBlockSlot(\''+dateISO+'\',\''+blockId+'\','+slotIdx+',\''+c.id+'\')">'
       +'<span>'+esc(c.name)+'</span><span class="stars-mini">'+'★'.repeat(c.rating)+'☆'.repeat(5-c.rating)+'</span></button>';
-  }).join('') || '<p class="muted" style="padding:12px">Não há trabalhadores qualificados e disponíveis para este trabalho neste período.</p>';
+  }).join('') || '<p class="muted" style="padding:12px">Não há trabalhadores qualificados e disponíveis para este trabalho neste horário (verifique férias e conflitos de horário com outros blocos).</p>';
   var html = '<h3>'+jobLabel(job)+'</h3>'
-    +'<p class="muted" style="margin-bottom:6px">Esta semana</p>'
-    +renderWeekHistoryForJob(jobId, dateISO)
+    +'<p class="muted">'+block.start+'–'+block.end+'</p>'
+    +'<p class="muted" style="margin-bottom:6px;margin-top:14px">Esta semana</p>'
+    +renderWeekHistoryForJob(block.jobId, dateISO)
     +'<p class="muted" style="margin-top:16px">Escolher trabalhador para esta posição</p>'
     +'<div class="candidate-list">'+rows+'</div>'
-    +(currentWid ? '<button type="button" class="btn-secondary" style="width:100%" onclick="assignWorkerToSlot(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+slotIdx+',null)">Deixar vaga em aberto</button>' : '')
+    +(currentWid ? '<button type="button" class="btn-secondary" style="width:100%" onclick="assignWorkerToBlockSlot(\''+dateISO+'\',\''+blockId+'\','+slotIdx+',null)">Deixar vaga em aberto</button>' : '')
     +'<div class="modal-actions"><button type="button" class="btn-secondary" onclick="closeModal()">Fechar</button></div>';
   openModal(html);
 }
@@ -548,11 +548,18 @@ function deleteWorker(id){
   if (!confirm('Eliminar este trabalhador? Esta ação não pode ser desfeita.')) return;
   state.workers = state.workers.filter(function(w){ return w.id!==id; });
   Object.values(state.schedules).forEach(function(day){
-    Object.values(day.periods).forEach(function(period){
-      Object.keys(period).forEach(function(jobId){
-        period[jobId] = (period[jobId]||[]).map(function(w){ return w===id ? null : w; });
+    if (day.blocks){
+      day.blocks.forEach(function(b){
+        b.workers = b.workers.map(function(w){ return w===id ? null : w; });
       });
-    });
+    }
+    if (day.periods){
+      Object.values(day.periods).forEach(function(period){
+        Object.keys(period).forEach(function(jobId){
+          period[jobId] = (period[jobId]||[]).map(function(w){ return w===id ? null : w; });
+        });
+      });
+    }
   });
   saveState(); closeModal(); draftWorker=null; render();
 }
@@ -603,8 +610,11 @@ function deleteJob(id){
   state.jobs = state.jobs.filter(function(j){ return j.id!==id; });
   state.workers.forEach(function(w){ if (w.skills) delete w.skills[id]; });
   Object.values(state.schedules).forEach(function(day){
-    day.activeJobs = (day.activeJobs||[]).filter(function(jid){ return jid!==id; });
-    Object.values(day.periods).forEach(function(p){ delete p[id]; });
+    if (day.blocks) day.blocks = day.blocks.filter(function(b){ return b.jobId!==id; });
+    if (day.periods){
+      day.activeJobs = (day.activeJobs||[]).filter(function(jid){ return jid!==id; });
+      Object.values(day.periods).forEach(function(p){ delete p[id]; });
+    }
   });
   saveState(); closeModal(); render();
 }
@@ -709,20 +719,16 @@ function renderSemanaView(){
   var unfilled = 0;
   weekDates.forEach(function(d){
     var day = getDayView(d);
-    day.activeJobs.forEach(function(jid){
-      activeJobIds.add(jid);
-      var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
-      periodKeys.forEach(function(pk){
-        var slots = (day.periods[pk] && day.periods[pk][jid]) || [];
-        unfilled += slots.filter(function(s){ return !s; }).length;
-      });
+    (day.blocks||[]).forEach(function(b){
+      activeJobIds.add(b.jobId);
+      unfilled += b.workers.filter(function(w){ return !w; }).length;
     });
   });
   var jobsThisWeek = state.jobs.filter(function(j){ return activeJobIds.has(j.id); });
   var warningHtml = unfilled>0 ? '<div class="warning-card">⚠️ '+unfilled+' vaga'+(unfilled===1?'':'s')+' por preencher esta semana</div>' : '';
 
   var body = jobsThisWeek.length ? jobsThisWeek.map(function(job){ return renderJobWeekCard(job, weekDates); }).join('')
-    : '<div class="empty-state"><div class="empty-state-icon">📅</div><p class="muted">Nenhum trabalho ativo nesta semana ainda.</p><button type="button" class="btn-primary btn-small" onclick="switchEscalaView(\'dia\')">Ativar trabalhos por dia</button></div>';
+    : '<div class="empty-state"><div class="empty-state-icon">📅</div><p class="muted">Nenhum bloco definido nesta semana ainda.</p><button type="button" class="btn-primary btn-small" onclick="switchEscalaView(\'dia\')">Adicionar blocos por dia</button></div>';
 
   return '<div class="date-nav"><button type="button" onclick="changeWeek(-1)">◄</button><div class="date-label">'+label+'</div><button type="button" onclick="changeWeek(1)">►</button></div>'
     +(todayBtn?'<div style="text-align:center;margin-bottom:14px">'+todayBtn+'</div>':'')
@@ -740,23 +746,22 @@ function renderJobWeekCard(job, weekDates){
     var dow = new Date(parts[0],parts[1]-1,parts[2]).getDay();
     var dLabel = dayAbbr[dow]+' '+parts[2]+(isToday?' <span style="color:var(--accent)">●</span>':'');
 
-    if (day.activeJobs.indexOf(job.id) === -1){
+    var blocksForJob = (day.blocks||[]).filter(function(b){ return b.jobId===job.id; })
+      .sort(function(a,b){ return timeToMinutes(a.start)-timeToMinutes(b.start); });
+
+    if (!blocksForJob.length){
       return '<div class="wg-cell '+(isToday?'is-today':'')+'"><div class="wg-day-label">'+dLabel+'</div><div class="wg-inactive">—</div></div>';
     }
-    var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
-    var periodLabels = {AM:'M', PM:'T', FULL:''};
-    var body = periodKeys.map(function(pk){
-      var slots = (day.periods[pk] && day.periods[pk][job.id]) || [];
-      var chips = slots.map(function(wid, idx){
+    var body = blocksForJob.map(function(b){
+      var chips = b.workers.map(function(wid, idx){
         if (wid){
           var w = state.workers.find(function(x){ return x.id===wid; });
           var wname = w ? w.name.split(' ')[0] : '?';
-          return '<button type="button" class="wg-chip" style="background:'+job.color+'22;border-color:'+job.color+'55;color:'+job.color+'" onclick="openSlotPicker(\''+dateISO+'\',\''+pk+'\',\''+job.id+'\','+idx+')">'+esc(wname)+'</button>';
+          return '<button type="button" class="wg-chip" style="background:'+job.color+'22;border-color:'+job.color+'55;color:'+job.color+'" onclick="openBlockSlotPicker(\''+dateISO+'\',\''+b.id+'\','+idx+')">'+esc(wname)+'</button>';
         }
-        return '<button type="button" class="wg-chip wg-chip-empty" onclick="openSlotPicker(\''+dateISO+'\',\''+pk+'\',\''+job.id+'\','+idx+')">+</button>';
+        return '<button type="button" class="wg-chip wg-chip-empty" onclick="openBlockSlotPicker(\''+dateISO+'\',\''+b.id+'\','+idx+')">+</button>';
       }).join('');
-      var plabel = periodLabels[pk] ? '<span class="wg-period-tag">'+periodLabels[pk]+'</span>' : '';
-      return '<div class="wg-period">'+plabel+chips+'</div>';
+      return '<div class="wg-period"><span class="wg-period-tag">'+b.start+'</span>'+chips+'</div>';
     }).join('');
 
     return '<div class="wg-cell '+(isToday?'is-today':'')+'"><div class="wg-day-label">'+dLabel+'</div>'+body+'</div>';
@@ -775,45 +780,45 @@ function renderJobWeekCard(job, weekDates){
 function renderDiaView(){
   var dateISO = state.ui.date;
   var day = getDayView(dateISO);
-  var periodKeys = day.split ? ['AM','PM'] : ['FULL'];
-  var periodLabels = {AM:'Manhã', PM:'Tarde', FULL:'Dia inteiro'};
-
-  var jobPicker = state.jobs.length ? '<div class="job-toggle-list">'+state.jobs.map(function(j){
-    var on = day.activeJobs.indexOf(j.id)!==-1;
-    var style = on ? ' style="background:'+j.color+';border-color:'+j.color+';color:var(--accent-ink)"' : '';
-    return '<button type="button" class="job-toggle '+(on?'on':'')+'"'+style+' onclick="toggleJobActive(\''+dateISO+'\',\''+j.id+'\')">'+jobLabel(j)+'</button>';
-  }).join('')+'</div>' : '<div class="empty-state"><div class="empty-state-icon">🛠️</div><p class="muted">Ainda não tem trabalhos definidos.</p><button type="button" class="btn-primary btn-small" onclick="switchTab(\'trabalhos\')">Ir a Trabalhos</button></div>';
-
-  var periodsHTML = day.activeJobs.length ? periodKeys.map(function(pk){ return renderPeriodBlock(dateISO, day, pk, periodLabels[pk]); }).join('') : '';
+  var sorted = (day.blocks||[]).slice().sort(function(a,b){ return timeToMinutes(a.start)-timeToMinutes(b.start); });
 
   var todayBtn = dateISO !== todayISO() ? '<button type="button" class="btn-small btn-secondary" onclick="jumpToday()">Hoje</button>' : '';
 
+  var blocksHtml = sorted.length ? sorted.map(function(b){ return renderBlockCard(dateISO, b); }).join('')
+    : '<div class="empty-state"><div class="empty-state-icon">🕐</div><p class="muted">Ainda sem blocos para este dia.</p></div>';
+
+  var actionsRow = '<div class="day-actions">'
+    +'<button type="button" class="btn-primary" onclick="openBlockEditor(\''+dateISO+'\',null)">+ Adicionar bloco</button>'
+    +(sorted.length ? '<button type="button" class="btn-secondary" onclick="openAutofillChoiceDay(\''+dateISO+'\')">⚡ Preencher tudo</button>' : '')
+    +'</div>';
+
   return '<div class="date-nav"><button type="button" onclick="changeDate(-1)">◄</button><div class="date-label">'+formatDatePT(dateISO)+'</div><button type="button" onclick="changeDate(1)">►</button></div>'
     +(todayBtn?'<div style="text-align:center;margin-bottom:14px">'+todayBtn+'</div>':'')
-    +'<div class="split-toggle"><button type="button" class="'+(!day.split?'on':'')+'" onclick="setSplitMode(\''+dateISO+'\',false)">Dia inteiro</button><button type="button" class="'+(day.split?'on':'')+'" onclick="setSplitMode(\''+dateISO+'\',true)">Manhã / Tarde</button></div>'
-    +'<h4>Trabalhos de hoje</h4>'
-    +jobPicker
-    +periodsHTML;
+    +actionsRow
+    +blocksHtml;
 }
-function renderPeriodBlock(dateISO, day, periodKey, label){
-  var rows = day.activeJobs.map(function(jobId){
-    var job = state.jobs.find(function(j){ return j.id===jobId; });
-    if (!job) return '';
-    var slots = (day.periods[periodKey] && day.periods[periodKey][jobId]) || new Array(job.positionsNeeded||1).fill(null);
-    var filled = slots.filter(Boolean).length;
-    var statusClass = filled===slots.length ? 'status-good' : (filled===0 ? 'status-empty' : 'status-partial');
-    var slotRows = slots.map(function(wid, idx){
-      if (wid){
-        var w = state.workers.find(function(x){ return x.id===wid; });
-        var rating = w && w.skills ? (w.skills[jobId]||0) : 0;
-        return '<button type="button" class="slot filled" style="border-left:3px solid '+job.color+'" onclick="openSlotPicker(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+idx+')"><span>'+esc(w?w.name:'?')+'</span><span class="mini-stars">'+'★'.repeat(rating)+'</span></button>';
-      }
-      return '<button type="button" class="slot empty" onclick="openSlotPicker(\''+dateISO+'\',\''+periodKey+'\',\''+jobId+'\','+idx+')">+ atribuir trabalhador</button>';
-    }).join('');
-    var statusIcon = statusClass==='status-good' ? '✅' : (statusClass==='status-empty' ? '❗' : '⚠️');
-    return '<div class="job-block"><div class="job-header '+statusClass+'" style="background:'+job.color+'14"><span style="color:'+job.color+'">'+jobLabel(job)+'</span><span class="ratio">'+statusIcon+' '+filled+'/'+slots.length+'</span></div><div class="slots">'+slotRows+'</div></div>';
+function renderBlockCard(dateISO, block){
+  var job = state.jobs.find(function(j){ return j.id===block.jobId; });
+  if (!job) return '';
+  var filled = block.workers.filter(Boolean).length;
+  var statusClass = filled===block.workers.length ? 'status-good' : (filled===0 ? 'status-empty' : 'status-partial');
+  var statusIcon = statusClass==='status-good' ? '✅' : (statusClass==='status-empty' ? '❗' : '⚠️');
+  var slotRows = block.workers.map(function(wid, idx){
+    if (wid){
+      var w = state.workers.find(function(x){ return x.id===wid; });
+      var rating = w && w.skills ? (w.skills[job.id]||0) : 0;
+      return '<button type="button" class="slot filled" style="border-left:3px solid '+job.color+'" onclick="openBlockSlotPicker(\''+dateISO+'\',\''+block.id+'\','+idx+')"><span>'+esc(w?w.name:'?')+'</span><span class="mini-stars">'+'★'.repeat(rating)+'</span></button>';
+    }
+    return '<button type="button" class="slot empty" onclick="openBlockSlotPicker(\''+dateISO+'\',\''+block.id+'\','+idx+')">+ atribuir trabalhador</button>';
   }).join('');
-  return '<div class="period-block"><div class="period-header"><span>'+esc(label)+'</span><button type="button" class="btn-small btn-secondary" onclick="openAutofillChoice(\''+dateISO+'\',\''+periodKey+'\')">Sugerir automaticamente</button></div>'+rows+'</div>';
+  return '<div class="job-block">'
+    +'<div class="job-header '+statusClass+'" style="background:'+job.color+'14">'
+    +'<span style="color:'+job.color+'">'+jobLabel(job)+'</span>'
+    +'<span class="ratio">'+statusIcon+' '+filled+'/'+block.workers.length+'</span>'
+    +'</div>'
+    +'<button type="button" class="block-time-row" onclick="openBlockEditor(\''+dateISO+'\',\''+block.id+'\')">🕐 '+block.start+'–'+block.end+' <span class="edit-hint">editar horário ✎</span></button>'
+    +'<div class="slots">'+slotRows+'</div>'
+    +'</div>';
 }
 
 // ---------- separador: Equipa ----------
@@ -861,21 +866,27 @@ function computeStats(days){
   var since = addDaysISO(todayISO(), -days);
   var today = todayISO();
   var workerStats = {}, jobStats = {};
+  function tally(jobId, wid){
+    if (!wid) return;
+    workerStats[wid] = (workerStats[wid]||0) + 1;
+    jobStats[jobId] = jobStats[jobId] || {count:0, workers:new Set()};
+    jobStats[jobId].count++;
+    jobStats[jobId].workers.add(wid);
+  }
   Object.keys(state.schedules).forEach(function(d){
     if (d < since || d > today) return;
     var day = state.schedules[d];
-    Object.keys(day.periods).forEach(function(pk){
-      var period = day.periods[pk];
-      Object.keys(period).forEach(function(jobId){
-        (period[jobId]||[]).forEach(function(wid){
-          if (!wid) return;
-          workerStats[wid] = (workerStats[wid]||0) + 1;
-          jobStats[jobId] = jobStats[jobId] || {count:0, workers:new Set()};
-          jobStats[jobId].count++;
-          jobStats[jobId].workers.add(wid);
+    (day.blocks||[]).forEach(function(b){
+      b.workers.forEach(function(wid){ tally(b.jobId, wid); });
+    });
+    if (day.periods){
+      Object.keys(day.periods).forEach(function(pk){
+        var period = day.periods[pk];
+        Object.keys(period).forEach(function(jobId){
+          (period[jobId]||[]).forEach(function(wid){ tally(jobId, wid); });
         });
       });
-    });
+    }
   });
   return {workerStats:workerStats, jobStats:jobStats};
 }
